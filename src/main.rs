@@ -1,4 +1,4 @@
-use std::net::{ToSocketAddrs, UdpSocket};
+use std::{net::{ToSocketAddrs, UdpSocket}, io::{Read, BufRead}};
 
 mod types;
 use types::*;
@@ -8,7 +8,7 @@ const BIND_ADDR: &str = "192.168.10.1:69";
 /// The size we give our empty buffers by default, code should truncate to correct size
 const BUFFER_SIZE: usize = 1500;
 /// The file we are serving
-const STAGE0: &[u8] = include_bytes!("D:/Code/Rust/AzphOS/bootloader/build/stage0.bin");
+//const STAGE0: &[u8] = include_bytes!("D:/Code/Rust/AzphOS/bootloader/build/stage0.bin");
 
 fn main() {
     let socket = UdpSocket::bind(BIND_ADDR).expect("Cannot bind");
@@ -35,6 +35,11 @@ fn main() {
 }
 
 fn handle_read(socket: &UdpSocket, src: impl ToSocketAddrs+Copy, tftp: &TFTP){
+    
+    let boot_file = std::fs::File::open("D:/Code/Rust/AzphOS/bootloader/build/stage0.bin").unwrap();
+    let mut reader = std::io::BufReader::with_capacity(1024*1024*32, boot_file);
+    let STAGE0 = reader.fill_buf().unwrap();
+    
     let data_len = STAGE0.len();
     //let mut blk_sz = tftp.blksize.unwrap_or(512);
     let mut blk_sz = 512;
@@ -46,7 +51,7 @@ fn handle_read(socket: &UdpSocket, src: impl ToSocketAddrs+Copy, tftp: &TFTP){
         if blk_start + blk_sz > data_len {
             blk_sz = data_len - blk_start;
         }
-        let len = tftp.data(&mut buf, blk_start, blk_sz, blk_ctr+1);
+        let len = tftp.data(&mut buf, &STAGE0, blk_start, blk_sz, blk_ctr+1);
         socket.send_to(&buf[..len], src).unwrap();
 
         // Check for ACK
@@ -133,14 +138,15 @@ impl<'tftp> TFTP<'tftp>{
         })
     }
     /// This function will generate a data packet
-    fn data(&self, buf: &mut [u8], blk_start: usize, blk_sz: usize, blk_ctr: usize) -> usize { 
+    #[inline(always)]
+    fn data(&self, buf: &mut [u8], file_data: &[u8], blk_start: usize, blk_sz: usize, blk_ctr: usize) -> usize { 
         let header_len = 4;
         buf[..2].copy_from_slice(&Opcode::Data.serialise());
 
         buf[2] = (blk_ctr >> 8) as u8;
         buf[3] = blk_ctr as u8;
 
-        buf[header_len..header_len+blk_sz].copy_from_slice(&STAGE0[blk_start .. blk_start + blk_sz]);
+        buf[header_len..header_len+blk_sz].copy_from_slice(&file_data[blk_start .. blk_start + blk_sz]);
 
         blk_sz + header_len
     }
