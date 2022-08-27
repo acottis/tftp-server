@@ -44,7 +44,7 @@ impl Options {
     }
 }
 
-#[derive(Debug)]
+#[derive(Debug, PartialEq)]
 pub enum Opcode{
     Read,
     Write,
