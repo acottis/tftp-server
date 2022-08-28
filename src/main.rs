@@ -58,11 +58,28 @@ fn handle_read(socket: &UdpSocket, src: impl ToSocketAddrs+Copy, tftp: &TFTP){
         let mut buf: [u8; 100] = [0u8; 100]; 
         let (len, _) = socket.recv_from(&mut buf).unwrap();
 
-        let tftp = TFTP::parse(&buf, len);
-        if let Some(t) = tftp{
-            if !t.ack_valid(blk_ctr+1) { break }
+        let res = TFTP::parse(&buf, len);
+        if let Some(res) = res{
+            if !res.ack_valid(blk_ctr+1) { break }
         }else{
             break
+        }
+
+        // Handle the wierd edge case of our file being divisable by our block size
+        if blk_start + blk_sz == data_len {
+            let len = tftp.data(&mut buf, &STAGE0, 0, 0, blk_ctr+2);
+            socket.send_to(&buf[..len], src).unwrap();
+            
+            // Check for ACK
+            let mut buf: [u8; 100] = [0u8; 100]; 
+            let (len, _) = socket.recv_from(&mut buf).unwrap();
+
+            let res = TFTP::parse(&buf, len);
+            if let Some(res) = res{
+                if !res.ack_valid(blk_ctr+2) { break }
+            }else{
+                break
+            }
         }
     }  
 }
