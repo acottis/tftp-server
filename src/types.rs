@@ -51,6 +51,7 @@ pub enum Opcode{
     Data,
     Ack,
     Err,
+    OAck,
 }
 
 impl TryFrom<&[u8]> for Opcode {
@@ -62,6 +63,7 @@ impl TryFrom<&[u8]> for Opcode {
             [0,3] => { Ok(Self::Data) },
             [0,4] => { Ok(Self::Ack) },
             [0,5] => { Ok(Self::Err) },
+            [0,6] => { Ok(Self::Err) },
             _ => { Err(()) }
         }
     }
@@ -75,6 +77,7 @@ impl Opcode {
             Self::Data  => [0,3],
             Self::Ack   => [0,4],
             Self::Err   => [0,5],
+            Self::OAck   => [0,6],
         }
     }
 }

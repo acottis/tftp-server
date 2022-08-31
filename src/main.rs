@@ -9,6 +9,8 @@ const BIND_ADDR: &str = "192.168.10.1:69";
 const BUFFER_SIZE: usize = 1500;
 /// The file we are serving
 //const STAGE0: &[u8] = include_bytes!("D:/Code/Rust/AzphOS/bootloader/build/stage0.bin");
+/// Blocksize as bytes
+const BLKSIZE: [u8; 7] = [0x62, 0x6C, 0x6B, 0x73, 0x69, 0x7A, 0x65];
 
 fn main() {
     let socket = UdpSocket::bind(BIND_ADDR).expect("Cannot bind");
@@ -40,10 +42,23 @@ fn handle_read(socket: &UdpSocket, src: impl ToSocketAddrs+Copy, tftp: &TFTP){
     let mut reader = std::io::BufReader::with_capacity(1024*1024*32, boot_file);
     let STAGE0 = reader.fill_buf().unwrap();
     
-    let data_len = STAGE0.len();
-    //let mut blk_sz = tftp.blksize.unwrap_or(512);
-    let mut blk_sz = 512;
+    // If a custom block size is requested we must acknowledge 
+    let mut blk_sz = if let Some(blk_sz) = tftp.blksize{
+        let mut buf: [u8; 20] = [0u8; 20];
+        // Generate a response and send
+        let len = tftp.options_acknowledge(&mut buf);
+        socket.send_to(&buf[..len], src).unwrap();
 
+        // Check for ACK NOT IMPLEMENTED, WE ASSUME IT WORKED dont @ me
+        let mut buf: [u8; 100] = [0u8; 100]; 
+        let (len, _) = socket.recv_from(&mut buf).unwrap();
+
+        blk_sz
+    }else{
+        512
+    };
+    
+    let data_len = STAGE0.len();
     for (blk_ctr, blk_start) in (0..data_len).step_by(blk_sz).enumerate() {
         let mut buf: [u8; 1500] = [0u8; 1500];
 
@@ -166,6 +181,21 @@ impl<'tftp> TFTP<'tftp>{
         buf[header_len..header_len+blk_sz].copy_from_slice(&file_data[blk_start .. blk_start + blk_sz]);
 
         blk_sz + header_len
+    }
+    /// Acknowledge an options request
+    #[inline(always)]
+    fn options_acknowledge(&self, buf: &mut [u8]) -> usize {
+        let mut buf_ptr = 0;
+        buf[..2].copy_from_slice(&Opcode::OAck.serialise());
+        buf_ptr += 2;
+        buf[buf_ptr..buf_ptr+BLKSIZE.len()].copy_from_slice(&BLKSIZE);
+        buf_ptr += BLKSIZE.len();
+        buf[buf_ptr] = 0x00; // Null term
+        buf_ptr += 1;
+        let blk_sz = format!("{}\0", self.blksize.unwrap().to_string());
+        buf[buf_ptr..buf_ptr+blk_sz.len()].copy_from_slice(blk_sz.as_bytes());
+
+        buf_ptr + blk_sz.len()
     }
     /// Check if we got the ACK we wanted
     #[inline(always)]
