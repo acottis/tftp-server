@@ -50,8 +50,7 @@ fn handle_read(socket: &UdpSocket, src: impl ToSocketAddrs+Copy, tftp: &TFTP){
         socket.send_to(&buf[..len], src).unwrap();
 
         // Check for ACK NOT IMPLEMENTED, WE ASSUME IT WORKED dont @ me
-        let mut buf: [u8; 100] = [0u8; 100]; 
-        let (len, _) = socket.recv_from(&mut buf).unwrap();
+        socket.recv_from(&mut buf).unwrap();
 
         blk_sz
     }else{
