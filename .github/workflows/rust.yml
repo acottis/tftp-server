@@ -7,8 +7,6 @@ jobs:
     steps:
       - name: Download the Repository
         uses: actions/checkout@v3
-      - name: Install Cargo Format Nightly
-        run: rustup component add rustfmt --toolchain nightly
       - name: Cargo test all
         run: cargo test --all --verbose
       - name: Cargo Build Release
