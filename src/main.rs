@@ -8,10 +8,12 @@ use types::*;
 
 /// The IP and port we &bind to
 const BIND_ADDR: &str = "192.168.10.1:69";
-/// The size we give our empty buffers by default, code should truncate to correct size
+/// The size we give our empty buffers by default, code should truncate to
+/// correct size
 const BUFFER_SIZE: usize = 1500;
 /// The file we are serving
-//const STAGE0: &[u8] = include_bytes!("D:/Code/Rust/AzphOS/bootloader/build/stage0.bin");
+//const STAGE0: &[u8] =
+// include_bytes!("D:/Code/Rust/AzphOS/bootloader/build/stage0.bin");
 /// Blocksize as bytes
 const BLKSIZE: [u8; 7] = [0x62, 0x6C, 0x6B, 0x73, 0x69, 0x7A, 0x65];
 
@@ -21,9 +23,11 @@ fn main() {
     let file_path = std::env::args().nth(1).unwrap_or(String::from(
         "D:/Code/Rust/AzphOS/bootloader/build/stage0.bin",
     ));
-    if !Path::new(&file_path).try_exists().unwrap(){
+    if !Path::new(&file_path).try_exists().unwrap() {
         log::error!("Boot file {file_path} does not exist");
-        log::warn!("\x1b[1;32mUsage: cargo r --release \"path-name-here\"\x1b[0m");
+        log::warn!(
+            "\x1b[1;32mUsage: cargo r --release \"path-name-here\"\x1b[0m"
+        );
         panic!("Boot file {file_path} does not exist")
     }
 
@@ -38,18 +42,26 @@ fn main() {
 
         //let now = unsafe { core::arch::x86_64::_rdtsc() };
         let tftp = TFTP::parse(&buf, len);
-        //println!("Cycles: {}", unsafe { core::arch::x86_64::_rdtsc() - now });
+        //println!("Cycles: {}", unsafe { core::arch::x86_64::_rdtsc() - now
+        // });
         if let Some(tftp) = tftp {
             match tftp.opcode {
                 Opcode::Read => {
+                    log::info!("--------------------------------------");
                     log::info!("TFTP read recieved from {src}");
-                    handle_read(&socket, &src, &tftp, &file_path).or_else( |e| -> Result<(),()> {
-                        log::error!("Failed to complete read request from {src}");
-                        log::error!("{e}");
-                        Ok(())
-                    }).unwrap();
-                },
-                _ => { unimplemented!(); }
+                    handle_read(&socket, &src, &tftp, &file_path)
+                        .or_else(|e| -> Result<(), ()> {
+                            log::error!(
+                                "Failed to complete read request from {src}"
+                            );
+                            log::error!("{e}");
+                            Ok(())
+                        })
+                        .unwrap();
+                }
+                _ => {
+                    unimplemented!();
+                }
             }
         }
     }
@@ -57,7 +69,7 @@ fn main() {
 
 fn handle_read(
     socket: &UdpSocket,
-    src: impl ToSocketAddrs + Copy,
+    src: impl ToSocketAddrs + Copy + ToString,
     tftp: &TFTP,
     file_path: impl AsRef<Path>,
 ) -> Result<(), std::io::Error> {
@@ -81,6 +93,7 @@ fn handle_read(
         512
     };
 
+    let mut last_sent_blk = blk_sz;
     let data_len = data.len();
     for (blk_ctr, blk_start) in (0..data_len).step_by(blk_sz).enumerate() {
         let mut buf: [u8; 1500] = [0u8; 1500];
@@ -91,7 +104,6 @@ fn handle_read(
         }
         let len = tftp.data(&mut buf, &data, blk_start, blk_sz, blk_ctr + 1);
         socket.send_to(&buf[..len], src).unwrap();
-
         // Check for ACK
         let mut buf: [u8; 100] = [0u8; 100];
         let (len, _) = socket.recv_from(&mut buf).unwrap();
@@ -101,14 +113,21 @@ fn handle_read(
             if !res.ack_valid(blk_ctr + 1) {
                 log::error!("Bad Ack: {} Received", blk_ctr + 1);
                 return Ok(());
-            }else{
+            } else {
                 log::info!("Ack: {} Received, {blk_sz} Byte(s)", blk_ctr + 1);
+                if blk_sz < last_sent_blk {
+                    log::info!("TFTP read finished, {data_len} Byte(s) Total send to {}", src.to_string());
+                    log::info!("--------------------------------------");
+                    return Ok(());
+                }
             }
         } else {
             return Ok(());
         }
+        last_sent_blk = blk_sz;
 
-        // Handle the wierd edge case of our file being divisable by our block size
+        // Handle the wierd edge case of our file being divisable by our block
+        // size
         if blk_start + blk_sz == data_len {
             let len = tftp.data(&mut buf, &data, 0, 0, blk_ctr + 2);
             socket.send_to(&buf[..len], src).unwrap();
@@ -122,15 +141,17 @@ fn handle_read(
                 if !res.ack_valid(blk_ctr + 1) {
                     log::error!("Bad Ack: {} Received", blk_ctr + 1);
                     return Ok(());
-                }else{
-                    log::info!("Ack: {} Received, {blk_sz} Byte(s)", blk_ctr + 1);
+                } else {
+                    log::info!(
+                        "Ack: {} Received, {blk_sz} Byte(s)",
+                        blk_ctr + 1
+                    );
                 }
             } else {
                 return Ok(());
             }
         }
     }
-    log::info!("TFTP read finished, {data_len} Byte(s) Total");
     Ok(())
 }
 
