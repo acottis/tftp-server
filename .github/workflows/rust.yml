@@ -1,6 +1,9 @@
 name: Basic Rust CI
 on: [push]
 
+env:
+  CARGO_TERM_COLOR: always
+
 jobs:
   BasicRustTest:
     runs-on: ubuntu-latest
