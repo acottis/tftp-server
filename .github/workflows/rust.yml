@@ -11,7 +11,7 @@ jobs:
       - name: Download the Repository
         uses: actions/checkout@v3
       - name: Cargo test all
-        run: cargo test --jobs 2 --release --keep-going --verbose 
+        run: cargo test --jobs 2 --release --verbose 
       - name: Cargo Build Release
         run: cargo build --release --verbose
       - name: Cargo Format Lint Check
