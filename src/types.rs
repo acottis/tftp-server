@@ -10,36 +10,36 @@ impl Options {
         match key {
             // Blksize
             [0x62, 0x6C, 0x6B, 0x73, 0x69, 0x7A, 0x65] => {
-                let sz = match core::str::from_utf8(&value) {
+                let sz = match core::str::from_utf8(value) {
                     Ok(sz_str) => match sz_str.parse::<usize>() {
                         Ok(sz) => sz,
                         _ => return Self::None,
                     },
                     _ => return Self::None,
                 };
-                return Self::Blksize(sz);
+                Self::Blksize(sz)
             }
             // tsize
             [0x74, 0x73, 0x69, 0x7A, 0x65] => {
-                let sz = match core::str::from_utf8(&value) {
+                let sz = match core::str::from_utf8(value) {
                     Ok(sz_str) => match sz_str.parse::<usize>() {
                         Ok(sz) => sz,
                         _ => return Self::None,
                     },
                     _ => return Self::None,
                 };
-                return Self::Tsize(sz);
+                Self::Tsize(sz)
             }
             _ => {
                 println!("Unknown Option");
                 println!("Parsing key:{key:X?}, value: {value:X?}");
-                return Self::None;
+                Self::None
             }
         }
     }
 }
 
-#[derive(Debug, PartialEq)]
+#[derive(Debug, PartialEq, Eq)]
 pub enum Opcode {
     Read,
     Write,
@@ -90,7 +90,7 @@ impl TryFrom<&[u8]> for Typ {
         let typ_slice = buf.splitn(2, |i| *i == 0x00).next();
         match typ_slice {
             Some([0x6f, 0x63, 0x74, 0x65, 0x74]) => Ok(Self::Octet),
-            _ => return Err(()),
+            _ => Err(()),
         }
     }
 }

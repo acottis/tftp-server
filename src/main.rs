@@ -20,9 +20,9 @@ const BLKSIZE: [u8; 7] = [0x62, 0x6C, 0x6B, 0x73, 0x69, 0x7A, 0x65];
 fn main() {
     env_logger::init();
     log::info!("TFTP Server starting...");
-    let file_path = std::env::args().nth(1).unwrap_or(String::from(
-        "D:/Code/Rust/AzphOS/bootloader/build/stage0.bin",
-    ));
+    let file_path = std::env::args().nth(1).unwrap_or_else(|| {
+        String::from("D:/Code/Rust/AzphOS/bootloader/build/stage0.bin")
+    });
     if !Path::new(&file_path).try_exists().unwrap() {
         log::error!("Boot file {file_path} does not exist");
         log::warn!(
@@ -41,7 +41,7 @@ fn main() {
         log::info!("Received {len} byte(s) from {src:?}");
 
         //let now = unsafe { core::arch::x86_64::_rdtsc() };
-        let tftp = TFTP::parse(&buf, len);
+        let tftp = Tftp::parse(&buf, len);
         //println!("Cycles: {}", unsafe { core::arch::x86_64::_rdtsc() - now
         // });
         if let Some(tftp) = tftp {
@@ -70,7 +70,7 @@ fn main() {
 fn handle_read(
     socket: &UdpSocket,
     src: impl ToSocketAddrs + Copy + ToString,
-    tftp: &TFTP,
+    tftp: &Tftp,
     file_path: impl AsRef<Path>,
 ) -> Result<(), std::io::Error> {
     let boot_file = std::fs::File::open(file_path)?;
@@ -102,13 +102,13 @@ fn handle_read(
         if blk_start + blk_sz > data_len {
             blk_sz = data_len - blk_start;
         }
-        let len = tftp.data(&mut buf, &data, blk_start, blk_sz, blk_ctr + 1);
+        let len = tftp.data(&mut buf, data, blk_start, blk_sz, blk_ctr + 1);
         socket.send_to(&buf[..len], src).unwrap();
         // Check for ACK
         let mut buf: [u8; 100] = [0u8; 100];
         let (len, _) = socket.recv_from(&mut buf).unwrap();
 
-        let res = TFTP::parse(&buf, len);
+        let res = Tftp::parse(&buf, len);
         if let Some(res) = res {
             if !res.ack_valid(blk_ctr + 1) {
                 log::error!("Bad Ack: {} Received", blk_ctr + 1);
@@ -129,14 +129,14 @@ fn handle_read(
         // Handle the wierd edge case of our file being divisable by our block
         // size
         if blk_start + blk_sz == data_len {
-            let len = tftp.data(&mut buf, &data, 0, 0, blk_ctr + 2);
+            let len = tftp.data(&mut buf, data, 0, 0, blk_ctr + 2);
             socket.send_to(&buf[..len], src).unwrap();
 
             // Check for ACK
             let mut buf: [u8; 100] = [0u8; 100];
             let (len, _) = socket.recv_from(&mut buf).unwrap();
 
-            let res = TFTP::parse(&buf, len);
+            let res = Tftp::parse(&buf, len);
             if let Some(res) = res {
                 if !res.ack_valid(blk_ctr + 1) {
                     log::error!("Bad Ack: {} Received", blk_ctr + 1);
@@ -157,7 +157,7 @@ fn handle_read(
 
 #[allow(dead_code)]
 #[derive(Debug)]
-struct TFTP<'tftp> {
+struct Tftp<'tftp> {
     opcode: Opcode,
     fname: Option<&'tftp str>,
     typ: Option<Typ>,
@@ -166,7 +166,7 @@ struct TFTP<'tftp> {
     block: Option<u16>,
 }
 
-impl<'tftp> TFTP<'tftp> {
+impl<'tftp> Tftp<'tftp> {
     /// Reads an incomming TFTP packet and converts to a [TFTP] struct
     fn parse(buf: &'tftp [u8], len: usize) -> Option<Self> {
         let mut data_ptr = 0;
@@ -190,7 +190,7 @@ impl<'tftp> TFTP<'tftp> {
 
         // Its a null terminated string
         let fname = core::str::from_utf8(
-            &buf[data_ptr..]
+            buf[data_ptr..]
                 .splitn(2, |i| *i == 0x00)
                 .next()
                 .unwrap_or_default(),
@@ -258,7 +258,7 @@ impl<'tftp> TFTP<'tftp> {
         buf_ptr += BLKSIZE.len();
         buf[buf_ptr] = 0x00; // Null term
         buf_ptr += 1;
-        let blk_sz = format!("{}\0", self.blksize.unwrap().to_string());
+        let blk_sz = format!("{}\0", self.blksize.unwrap());
         buf[buf_ptr..buf_ptr + blk_sz.len()].copy_from_slice(blk_sz.as_bytes());
 
         buf_ptr + blk_sz.len()

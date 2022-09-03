@@ -8,10 +8,12 @@ jobs:
       - name: Download the Repository
         uses: actions/checkout@v3
       - name: Install Cargo Format Nightly
-        uses: rustup component add rustfmt --toolchain nightly
+        run: rustup component add rustfmt --toolchain nightly
       - name: Cargo test all
         run: cargo test --all --verbose
-      - name: Cargo Format Lint Check
-        run: cargo fmt --all --check --verbose
       - name: Cargo Build Release
         run: cargo b --release --verbose
+      - name: Cargo Format Lint Check
+        run: cargo fmt --all --check --verbose
+      - name: Cargo Clippy Pedant
+        run: cargo clippy
