@@ -1,0 +1,15 @@
+name: Basic Rust CI
+on: [push]
+
+jobs:
+  BasicRustTest:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out repo
+        uses: actions/checkout@v3
+      - name: Cargo test all
+        run: cargo test --all --verbose
+      - name: Cargo Format Lint Check
+        run: cargo +nightly fmt --all --check --verbose
+      - name: Cargo Build Release
+        run: cargo b --release --verbose
